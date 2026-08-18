@@ -13,6 +13,7 @@ const AddSeo = () => {
     const navigate = useNavigate();
     const [isEditMode, setIsEditMode] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [dynamicPagesList, setDynamicPagesList] = useState(pagesList);
 
     const [formData, setFormData] = useState({
         page: "",
@@ -31,6 +32,93 @@ const AddSeo = () => {
     const ogEditorRef = useRef(null);
     const schemaEditorRef = useRef(null);
     const canonicalEditorRef = useRef(null);
+
+    useEffect(() => {
+        fetchDynamicPages();
+    }, []);
+
+    const fetchDynamicPages = async () => {
+        const list = [...pagesList];
+
+        // 1. Fetch Destinations
+        try {
+            const res = await api.get('/api/destinations/admin');
+            if (res.data?.success && Array.isArray(res.data.data)) {
+                res.data.data.forEach(dest => {
+                    const slug = dest.slug || dest._id;
+                    const path = `/destinations/${slug}`;
+                    if (!list.some(p => p.path === path)) {
+                        list.push({
+                            name: `Destination: ${dest.name}`,
+                            path: path
+                        });
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Error loading destinations for SEO:', err);
+        }
+
+        // 2. Fetch Service Details
+        try {
+            const res = await api.get('/api/service-details/admin');
+            if (res.data?.success && Array.isArray(res.data.data)) {
+                res.data.data.forEach(srv => {
+                    const slug = srv.slug || srv._id;
+                    const path = `/services/${slug}`;
+                    if (!list.some(p => p.path === path)) {
+                        list.push({
+                            name: `Service: ${srv.serviceTitle || srv.title}`,
+                            path: path
+                        });
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Error loading service details for SEO:', err);
+        }
+
+        // 3. Fetch Explore Services
+        try {
+            const res = await api.get('/api/explore-services');
+            if (res.data?.success && Array.isArray(res.data.data?.services)) {
+                res.data.data.services.forEach(card => {
+                    if (card.buttonUrl && card.buttonUrl.startsWith('/services/')) {
+                        const path = card.buttonUrl;
+                        if (!list.some(p => p.path === path)) {
+                            list.push({
+                                name: `Service Card: ${card.title}`,
+                                path: path
+                            });
+                        }
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Error loading explore services for SEO:', err);
+        }
+
+        // 4. Fetch Blogs
+        try {
+            const res = await api.get('/api/blogs/admin');
+            if (res.data?.success && Array.isArray(res.data.data)) {
+                res.data.data.forEach(blog => {
+                    const slug = blog.slug || blog._id;
+                    const path = `/blog/${slug}`;
+                    if (!list.some(p => p.path === path)) {
+                        list.push({
+                            name: `Blog: ${blog.title}`,
+                            path: path
+                        });
+                    }
+                });
+            }
+        } catch (err) {
+            console.error('Error loading blogs for SEO:', err);
+        }
+
+        setDynamicPagesList(list);
+    };
 
     useEffect(() => {
         if (location.state && location.state.seoData) {
@@ -242,11 +330,16 @@ const AddSeo = () => {
                                 disabled={isEditMode}
                             >
                                 <option value="">-- Select a Page --</option>
-                                {pagesList.map((page, index) => (
+                                {dynamicPagesList.map((page, index) => (
                                     <option key={index} value={page.path}>
                                         {page.name} ({page.path})
                                     </option>
                                 ))}
+                                {formData.page && !dynamicPagesList.some(p => p.path === formData.page) && (
+                                    <option value={formData.page}>
+                                        Custom Path ({formData.page})
+                                    </option>
+                                )}
                             </select>
                         </div>
 

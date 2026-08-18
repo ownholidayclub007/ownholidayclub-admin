@@ -85,7 +85,11 @@ const SeoList = () => {
 
     const getPageName = (path) => {
         const found = pagesList.find(p => p.path === path);
-        return found ? found.name : path;
+        if (found) return found.name;
+        if (path.startsWith('/destinations/')) return `Destination: ${path.replace('/destinations/', '')}`;
+        if (path.startsWith('/services/')) return `Service: ${path.replace('/services/', '')}`;
+        if (path.startsWith('/blog/')) return `Blog: ${path.replace('/blog/', '')}`;
+        return path;
     };
 
 
