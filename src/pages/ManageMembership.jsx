@@ -10,7 +10,7 @@ import {
     Star,
     Crown,
     Sparkles,
-    Gem,
+    Gem, 
     CreditCard,
     CheckCircle,
     X,
@@ -536,7 +536,6 @@ const ManageMembership = () => {
                                 </table>
                             </div>
                         </div>
-
                         {/* Features Summary Card */}
                         {isEditing && (
                             <div className="mt-8 bg-slate-50 p-6 border-2 border-dashed border-slate-200">
