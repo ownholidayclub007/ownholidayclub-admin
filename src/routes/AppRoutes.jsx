@@ -39,6 +39,7 @@ import HolidayBookings from "../pages/HolidayBookings";
 import AppGallery from "../pages/AppGallery";
 import AppVideoGallery from "../pages/AppVideoGallery";
 import AddBudget from "../pages/AddBudget";
+import ReferralCodes from "../pages/ReferralCodes";
 
 /* Protected */
 import ProtectedRoute from "./ProtectedRoute";
@@ -88,6 +89,7 @@ export default function AppRoutes() {
           <Route path="app-gallery" element={<AppGallery />} />
           <Route path="app-video-gallery" element={<AppVideoGallery />} />
           <Route path="add-budget" element={<AddBudget />} />
+          <Route path="referral-codes" element={<ReferralCodes />} />
 
         </Route>
       </Route>

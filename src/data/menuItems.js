@@ -43,6 +43,12 @@ export const menuItems = [
   },
   {
     type: "item",
+    label: "Referral Codes",
+    icon: Share2,
+    path: "/referral-codes",
+  },
+  {
+    type: "item",
     label: "Activity Logs",
     icon: Activity,
     path: "/activity-logs",
