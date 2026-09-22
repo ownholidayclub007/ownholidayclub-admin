@@ -40,6 +40,8 @@ import AppGallery from "../pages/AppGallery";
 import AppVideoGallery from "../pages/AppVideoGallery";
 import AddBudget from "../pages/AddBudget";
 import ReferralCodes from "../pages/ReferralCodes";
+import AddTestimonials from "../pages/AddTestimonials";
+import TestimonialsList from "../pages/TestimonialsList";
 
 /* Protected */
 import ProtectedRoute from "./ProtectedRoute";
@@ -90,6 +92,8 @@ export default function AppRoutes() {
           <Route path="app-video-gallery" element={<AppVideoGallery />} />
           <Route path="add-budget" element={<AddBudget />} />
           <Route path="referral-codes" element={<ReferralCodes />} />
+          <Route path="add-testimonials" element={<AddTestimonials />} />
+          <Route path="testimonials-list" element={<TestimonialsList />} />
 
         </Route>
       </Route>

@@ -177,7 +177,7 @@ const ReferralCodes = () => {
                 codes.map((item) => (
                   <tr key={item._id} className="border-b border-gray-200 even:bg-gray-50">
                     <td className="px-4 py-3 font-bold text-[#C8102E]">{item.code}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-gray-800">{item.installationCount || 0}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-800">{item.membershipCount || 0}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-"}
                     </td>
