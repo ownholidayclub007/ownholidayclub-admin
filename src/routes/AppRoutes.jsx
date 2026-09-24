@@ -11,6 +11,7 @@ import ChangePassword from "../pages/ChangePassword";
 import ManageLeads from "../pages/ManageLeads";
 import ManageMembership from "../pages/ManageMembership";
 import ManageMembers from "../pages/ManageMembers";
+import PendingApplications from "../pages/PendingApplications";
 import MemberProfile from "../pages/MemberProfile";
 import ExploreServices from "../pages/ExploreServices";
 import HomeSlider from "../pages/HomeSlider";
@@ -71,6 +72,7 @@ export default function AppRoutes() {
           <Route path="add-membership" element={<ManageMembership />} />
           <Route path="membership-list" element={<ManageMembership />} />
           <Route path="members-list" element={<ManageMembers />} />
+          <Route path="pending-applications" element={<PendingApplications />} />
           <Route path="holiday-bookings" element={<HolidayBookings />} />
           <Route path="member-profile/:id" element={<MemberProfile />} />
           <Route path="change-password" element={<ChangePassword />} />

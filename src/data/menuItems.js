@@ -8,6 +8,7 @@ import {
   Lock,
   Settings,
   CalendarCheck,
+  Clock,
   MessageSquare,
   TrendingUp,
   Share2,
@@ -239,6 +240,12 @@ export const menuItems = [
     label: "Members List",
     icon: Users,
     path: "/members-list",
+  },
+  {
+    type: "item",
+    label: "Pending Applications",
+    icon: Clock,
+    path: "/pending-applications",
   },
   {
     type: "item",
