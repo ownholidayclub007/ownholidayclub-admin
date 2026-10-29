@@ -9,7 +9,8 @@ const itemsPerPage = 10;
 
 const ReferralCodes = () => {
   const [codes, setCodes] = useState([]);
-  const [count, setCount] = useState(10);
+  const [vpName, setVpName] = useState("");
+  const [customCode, setCustomCode] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,29 +55,44 @@ const ReferralCodes = () => {
     fetchCodes(1);
   }, []);
 
-  const handleGenerate = async () => {
-    const safeCount = Number(count) > 0 ? Number(count) : 10;
+  const handleGenerateVpCode = async (event) => {
+    event.preventDefault();
+    const referrerName = vpName.trim();
+    const code = customCode.trim().toUpperCase();
+
+    if (!referrerName || !/^[A-Z]+(?:0[1-9]|[1-9]\d)$/.test(code)) {
+      Swal.fire(
+        "Check VP details",
+        "Enter the VP name and a code ending with exactly 2 digits (e.g. DS01).",
+        "warning"
+      );
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const response = await api.post("/api/referral-codes/generate", { count: safeCount });
+      const response = await api.post("/api/referral-codes/generate-custom", {
+        referrerName,
+        code,
+      });
 
       if (response.data.success) {
-        setCount(10);
+        setVpName("");
+        setCustomCode("");
         await fetchCodes(1);
         Swal.fire({
           icon: "success",
-          title: "Referral codes generated",
-          text: `${response.data.count} referral code(s) created successfully.`,
-          timer: 1800,
+          title: "VP referral code generated",
+          text: `${response.data.data.referrerName}: ${response.data.data.code}`,
+          timer: 2200,
           showConfirmButton: false,
         });
       }
     } catch (error) {
-      console.error("Generate referral codes failed:", error);
+      console.error("Generate VP referral code failed:", error);
       Swal.fire(
         "Error",
-        error?.response?.data?.message || "Referral codes could not be generated.",
+        error?.response?.data?.message || "VP referral code could not be generated.",
         "error"
       );
     } finally {
@@ -131,36 +147,67 @@ const ReferralCodes = () => {
           description="Generate unique referral codes for membership purchases and track how many members used each code."
         />
 
-        <div className="bg-[#f7f7f7] border-2 border-gray-200 p-5 flex flex-col md:flex-row md:items-end gap-4">
+        <form
+          onSubmit={handleGenerateVpCode}
+          className="bg-[#f7f7f7] border-2 border-gray-200 p-5 flex flex-col md:flex-row md:items-end gap-4"
+        >
           <div className="flex-1">
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-2">
-              Number of referral codes to generate
+            <label
+              htmlFor="vp-name"
+              className="block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-2"
+            >
+              VP name
             </label>
             <input
-              type="number"
-              min="1"
-              value={count}
-              onChange={(e) => setCount(e.target.value)}
+              id="vp-name"
+              type="text"
+              maxLength={100}
+              value={vpName}
+              onChange={(e) => setVpName(e.target.value)}
+              placeholder="e.g. Divya Singh"
               className="w-full border-2 border-gray-300 px-4 py-3 text-sm focus:border-[#C8102E] outline-none rounded-none"
             />
           </div>
 
+          <div className="flex-1">
+            <label
+              htmlFor="vp-referral-code"
+              className="block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-2"
+            >
+              Referral code (you choose)
+            </label>
+            <input
+              id="vp-referral-code"
+              type="text"
+              maxLength={30}
+              value={customCode}
+              onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+              placeholder="e.g. DS01"
+              pattern="[A-Za-z]+(0[1-9]|[1-9][0-9])"
+              title="Use your chosen name or initials followed by a unique number from 01 to 99, e.g. DS01."
+              className="w-full border-2 border-gray-300 px-4 py-3 text-sm focus:border-[#C8102E] outline-none rounded-none"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Choose any name/prefix and an unused number from 01 to 99 (e.g. DS01, PS02).
+            </p>
+          </div>
+
           <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isLoading}
+            type="submit"
+            disabled={isLoading || !vpName.trim() || !customCode.trim()}
             className="inline-flex items-center justify-center gap-2 bg-[#C8102E] px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-white disabled:opacity-60"
           >
             {isLoading ? <RefreshCw className="animate-spin" size={14} /> : <Plus size={14} />}
-            Generate Codes
+            Generate VP Code
           </button>
-        </div>
+        </form>
 
         <div className="overflow-x-auto border-2 border-gray-200">
           <table className="min-w-full text-left">
             <thead className="bg-[#111827] text-white">
               <tr>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Code</th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">VP Name</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Memberships</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Created</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Action</th>
@@ -169,7 +216,7 @@ const ReferralCodes = () => {
             <tbody>
               {codes.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-4 py-10 text-center text-sm text-gray-500">
+                  <td colSpan="5" className="px-4 py-10 text-center text-sm text-gray-500">
                     No referral codes generated yet.
                   </td>
                 </tr>
@@ -177,6 +224,7 @@ const ReferralCodes = () => {
                 codes.map((item) => (
                   <tr key={item._id} className="border-b border-gray-200 even:bg-gray-50">
                     <td className="px-4 py-3 font-bold text-[#C8102E]">{item.code}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{item.referrerName || "-"}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-800">{item.membershipCount || 0}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-"}
