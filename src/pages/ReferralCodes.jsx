@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Copy, Download, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
 import api from "../lib/api";
@@ -14,6 +15,86 @@ const ReferralCodes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPreparingSheet, setIsPreparingSheet] = useState(false);
+
+  const fetchAllCodes = async () => {
+    const firstPageResponse = await api.get("/api/referral-codes", {
+      params: { page: 1, limit: 50 },
+    });
+
+    if (!firstPageResponse.data.success) {
+      throw new Error("Unable to load referral codes for export.");
+    }
+
+    const firstPageCodes = firstPageResponse.data.data || [];
+    const totalPages = Number(firstPageResponse.data.totalPages || 1);
+    const remainingPages = await Promise.all(
+      Array.from({ length: Math.max(0, totalPages - 1) }, (_, index) =>
+        api.get("/api/referral-codes", {
+          params: { page: index + 2, limit: 50 },
+        })
+      )
+    );
+
+    return [
+      ...firstPageCodes,
+      ...remainingPages.flatMap((response) => {
+        if (!response.data.success) {
+          throw new Error("Unable to load all referral codes for export.");
+        }
+        return response.data.data || [];
+      }),
+    ];
+  };
+
+  const getExportRows = (items) => [
+    ["S.NO", "Referral Code", "VP Name", "Memberships", "Status", "Created"],
+    ...items.map((item, index) => [
+      index + 1,
+      item.code || "",
+      item.referrerName || "-",
+      item.membershipCount || 0,
+      item.isActive === false ? "Inactive" : "Active",
+      item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-",
+    ]),
+  ];
+
+  const addWorksheet = (workbook, name, rows) => {
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 8 },
+      { wch: 20 },
+      { wch: 28 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 14 },
+    ];
+    XLSX.utils.book_append_sheet(workbook, worksheet, name);
+  };
+
+  const handleDownloadExcel = async () => {
+    setIsPreparingSheet(true);
+    try {
+      const allCodes = await fetchAllCodes();
+      if (allCodes.length === 0) {
+        Swal.fire("No data", "There are no referral codes to download.", "info");
+        return;
+      }
+
+      const workbook = XLSX.utils.book_new();
+      addWorksheet(workbook, "All Referral Codes", getExportRows(allCodes));
+      XLSX.writeFile(workbook, "Referral_Codes.xlsx");
+    } catch (error) {
+      console.error("Download referral codes failed:", error);
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || error.message || "Unable to download referral codes.",
+        "error"
+      );
+    } finally {
+      setIsPreparingSheet(false);
+    }
+  };
 
   const fetchCodes = async (page = 1) => {
     setIsLoading(true);
@@ -48,6 +129,25 @@ const ReferralCodes = () => {
     } catch (error) {
       console.error("Copy code failed:", error);
       Swal.fire("Error", "Unable to copy the referral code.", "error");
+    }
+  };
+
+  const handleShareCode = async (code) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: code });
+        return;
+      }
+
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(code)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.error("Share referral code failed:", error);
+      Swal.fire("Error", "Unable to share the referral code.", "error");
     }
   };
 
@@ -145,7 +245,21 @@ const ReferralCodes = () => {
         <PageHeader
           title="REFERRAL CODES"
           description="Generate unique referral codes for membership purchases and track how many members used each code."
-        />
+        >
+          <button
+            type="button"
+            onClick={handleDownloadExcel}
+            disabled={isPreparingSheet || isLoading}
+            className="inline-flex items-center justify-center gap-2 border-2 border-[#C8102E] px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-[#C8102E] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isPreparingSheet ? (
+              <RefreshCw className="animate-spin" size={14} />
+            ) : (
+              <Download size={14} />
+            )}
+            Download Excel
+          </button>
+        </PageHeader>
 
         <form
           onSubmit={handleGenerateVpCode}
@@ -239,6 +353,15 @@ const ReferralCodes = () => {
                           aria-label={`Copy referral code ${item.code}`}
                         >
                           <Copy size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShareCode(item.code)}
+                          className="inline-flex items-center justify-center border-2 border-green-200 bg-green-50 p-2 text-green-700 hover:bg-green-100"
+                          title={`Share referral code ${item.code}`}
+                          aria-label={`Share referral code ${item.code}`}
+                        >
+                          <Share2 size={14} />
                         </button>
                         <button
                           type="button"
