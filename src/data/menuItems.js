@@ -24,6 +24,7 @@ import {
   Globe,
   Star,
   CreditCard,
+  FilePlus2,
   Newspaper,
   UserCheck,
   Info,
@@ -234,6 +235,12 @@ export const menuItems = [
     label: "Add Memberships",
     icon: CreditCard,
     path: "/membership-list",
+  },
+  {
+    type: "item",
+    label: "Manual Membership",
+    icon: FilePlus2,
+    path: "/manual-membership",
   },
   {
     type: "item",

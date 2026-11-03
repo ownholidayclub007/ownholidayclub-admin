@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-    ArrowLeft, CheckCircle, XCircle, Printer, AlertCircle, User, Download, FileText
+    ArrowLeft, Printer, FileText, Send
 } from "lucide-react";
 import api from "../lib/api";
 import Swal from "sweetalert2";
@@ -117,14 +117,11 @@ const MemberProfile = () => {
     const navigate = useNavigate();
     const [member, setMember] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        if (id) fetchMemberDetails();
-    }, [id]);
+    const [sendingInvoiceId, setSendingInvoiceId] = useState("");
+    const [openingDocument, setOpeningDocument] = useState("");
 
     const fetchMemberDetails = async () => {
         try {
-            setIsLoading(true);
             const response = await api.get(`/api/members/${id}`);
             setMember(response.data.member);
         } catch (error) {
@@ -134,6 +131,108 @@ const MemberProfile = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    useEffect(() => {
+        if (!id) return undefined;
+        let isCurrent = true;
+        api.get(`/api/members/${id}`)
+            .then((response) => {
+                if (isCurrent) setMember(response.data.member);
+            })
+            .catch((error) => {
+                if (!isCurrent) return;
+                console.error("Error fetching member:", error);
+                Swal.fire({ icon: "error", title: "Error", text: "Failed to load member profile" });
+                navigate("/members-list");
+            })
+            .finally(() => {
+                if (isCurrent) setIsLoading(false);
+            });
+        return () => {
+            isCurrent = false;
+        };
+    }, [id, navigate]);
+
+    const sendInvoice = async (payment) => {
+        const paymentId = payment.paymentId || payment._id;
+        if (!paymentId) return;
+        const result = await Swal.fire({
+            title: "Send membership invoice?",
+            text: `The invoice will be emailed to ${member.email}.`,
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Send invoice",
+            confirmButtonColor: "#C8102E",
+            cancelButtonText: "Cancel",
+        });
+        if (!result.isConfirmed) return;
+
+        setSendingInvoiceId(paymentId);
+        try {
+            const response = await api.post(
+                `/api/members/${encodeURIComponent(id)}/payments/${encodeURIComponent(paymentId)}/invoice/send`,
+            );
+            await Swal.fire("Invoice sent", response.data.message, "success");
+            await fetchMemberDetails();
+        } catch (error) {
+            Swal.fire(
+                "Could not send invoice",
+                error.response?.data?.message || "Please try again.",
+                "error",
+            );
+        } finally {
+            setSendingInvoiceId("");
+        }
+    };
+
+    const openPrivateDocument = async (documentType) => {
+        setOpeningDocument(documentType);
+        try {
+            const response = await api.get(
+                `/api/members/${encodeURIComponent(id)}/private-documents/${encodeURIComponent(documentType)}`,
+                { responseType: "blob" },
+            );
+            const url = URL.createObjectURL(response.data);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = member.documents?.[documentType]?.name || `${documentType}-document`;
+            link.rel = "noreferrer";
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch (error) {
+            Swal.fire(
+                "Could not open document",
+                error.response?.data?.message || "Please try again.",
+                "error",
+            );
+        } finally {
+            setOpeningDocument("");
+        }
+    };
+
+    const renderPrivateDocument = (documentType, label) => {
+        const doc = member.documents?.[documentType];
+        if (doc?.url) {
+            return (
+                <a href={doc.url} target="_blank" rel="noreferrer" style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                    <FileText size={14} /> VIEW DOCUMENT ({safe(doc.proofType || label)})
+                </a>
+            );
+        }
+        if (doc?.encryptedData || doc?.name) {
+            return (
+                <button
+                    type="button"
+                    onClick={() => openPrivateDocument(documentType)}
+                    disabled={openingDocument === documentType}
+                    style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, border: 0, background: "none", cursor: "pointer" }}
+                >
+                    <FileText size={14} /> {openingDocument === documentType ? "OPENING..." : `VIEW ${label.toUpperCase()}`}
+                </button>
+            );
+        }
+        return "NOT SUBMITTED";
     };
 
     if (isLoading) {
@@ -269,7 +368,8 @@ const MemberProfile = () => {
                                             <th style={{ ...LC, fontSize: 10, width: "25%" }}>Transaction ID</th>
                                             <th style={{ ...LC, fontSize: 10, width: "20%" }}>Amount</th>
                                             <th style={{ ...LC, fontSize: 10, width: "25%" }}>Date</th>
-                                            <th style={{ ...LC, fontSize: 10, width: "30%", borderRight: "none" }}>Status</th>
+                                            <th style={{ ...LC, fontSize: 10, width: "18%" }}>Status</th>
+                                            <th style={{ ...LC, fontSize: 10, width: "12%", borderRight: "none" }}>Invoice</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -279,12 +379,34 @@ const MemberProfile = () => {
                                                     <td style={VCD}>{p.paymentId}</td>
                                                     <td style={VCD}>₹{p.amount / 100}</td>
                                                     <td style={VCD}>{new Date(p.paidAt).toLocaleString()}</td>
-                                                    <td style={{ ...VC, fontWeight: 700, color: p.status === 'captured' ? 'green' : 'orange' }}>{p.status?.toUpperCase()}</td>
+                                                    <td style={{ ...VCD, fontWeight: 700, color: p.status === 'captured' ? 'green' : 'orange' }}>
+                                                        {p.status?.toUpperCase()}
+                                                        {p.notes?.invoiceEmailStatus && (
+                                                            <div style={{ marginTop: 3, fontSize: 9, color: p.notes.invoiceEmailStatus === "sent" ? "#15803d" : "#b45309" }}>
+                                                                EMAIL {p.notes.invoiceEmailStatus.toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td style={VC}>
+                                                        {p.status === "captured" ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => sendInvoice(p)}
+                                                                disabled={sendingInvoiceId === (p.paymentId || p._id)}
+                                                                style={{ display: "inline-flex", alignItems: "center", gap: 5, border: 0, background: "none", color: "#C8102E", cursor: "pointer", fontWeight: 700, fontSize: 10, opacity: sendingInvoiceId === (p.paymentId || p._id) ? 0.5 : 1 }}
+                                                            >
+                                                                <Send size={12} />
+                                                                {sendingInvoiceId === (p.paymentId || p._id)
+                                                                    ? "SENDING"
+                                                                    : p.notes?.invoiceEmailStatus === "sent" ? "RESEND" : "SEND"}
+                                                            </button>
+                                                        ) : "—"}
+                                                    </td>
                                                 </tr>
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={4} style={{ ...VC, textAlign: "center", fontStyle: "italic", color: "#999" }}>No payment records found</td>
+                                                <td colSpan={5} style={{ ...VC, textAlign: "center", fontStyle: "italic", color: "#999" }}>No payment records found</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -363,37 +485,25 @@ const MemberProfile = () => {
                         <tr style={{ borderBottom: "1px solid #d1d5db" }}>
                             <td style={LC}>ID Proof (Aadhaar/PAN)</td>
                             <td colSpan={2} style={VCD}>
-                                {member.documents?.idProof?.url ? (
-                                    <a href={member.documents.idProof.url} target="_blank" rel="noreferrer" style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                                        <FileText size={14} /> VIEW DOCUMENT ({safe(member.documents.idProof.proofType || 'ID Proof')})
-                                    </a>
-                                ) : "NOT SUBMITTED"}
+                                {renderPrivateDocument("idProof", "Aadhaar")}
                             </td>
                             <td style={LC}>Address Proof</td>
                             <td colSpan={2} style={VC}>
-                                {member.documents?.addressProof?.url ? (
-                                    <a href={member.documents.addressProof.url} target="_blank" rel="noreferrer" style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                                        <FileText size={14} /> VIEW DOCUMENT ({safe(member.documents.addressProof.proofType || 'Address Proof')})
-                                    </a>
-                                ) : "NOT SUBMITTED"}
+                                {renderPrivateDocument("addressProof", "Address proof")}
                             </td>
                         </tr>
                         <tr style={{ borderBottom: "1px solid #d1d5db" }}>
+                            <td style={LC}>PAN Card</td>
+                            <td colSpan={2} style={VCD}>
+                                {renderPrivateDocument("panCard", "PAN")}
+                            </td>
                             <td style={LC}>Spouse ID Proof</td>
                             <td colSpan={2} style={VCD}>
-                                {member.documents?.spouseId?.url ? (
-                                    <a href={member.documents.spouseId.url} target="_blank" rel="noreferrer" style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                                        <FileText size={14} /> VIEW DOCUMENT ({safe(member.documents.spouseId.proofType || 'Spouse ID')})
-                                    </a>
-                                ) : "NOT SUBMITTED"}
+                                {renderPrivateDocument("spouseId", "Spouse ID")}
                             </td>
                             <td style={LC}>Profile Image</td>
                             <td colSpan={2} style={VC}>
-                                {member.documents?.profileImage?.url ? (
-                                    <a href={member.documents.profileImage.url} target="_blank" rel="noreferrer" style={{ color: "#C8102E", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                                        <FileText size={14} /> VIEW PROFILE IMAGE
-                                    </a>
-                                ) : "NOT SUBMITTED"}
+                                {renderPrivateDocument("profileImage", "Profile image")}
                             </td>
                         </tr>
                     </Section>
