@@ -20,7 +20,6 @@ import {
   CreditCard,
   FilePlus2,
   Newspaper,
-  UserCheck,
   Phone,
 } from "lucide-react";
 
@@ -41,12 +40,6 @@ export const menuItems = [
     label: "Referral Codes",
     icon: Share2,
     path: "/referral-codes",
-  },
-  {
-    type: "item",
-    label: "Influencer Accounts",
-    icon: UserCheck,
-    path: "/influencers",
   },
   {
     type: "item",

@@ -43,7 +43,6 @@ import AddBudget from "../pages/AddBudget";
 import ReferralCodes from "../pages/ReferralCodes";
 import AddTestimonials from "../pages/AddTestimonials";
 import TestimonialsList from "../pages/TestimonialsList";
-import ManageInfluencers from "../pages/ManageInfluencers";
 import InfluencerDashboard from "../pages/InfluencerDashboard";
 
 /* Protected */
@@ -105,7 +104,6 @@ export default function AppRoutes() {
           <Route path="app-video-gallery" element={<AppVideoGallery />} />
           <Route path="add-budget" element={<AddBudget />} />
           <Route path="referral-codes" element={<ReferralCodes />} />
-          <Route path="influencers" element={<ManageInfluencers />} />
           <Route path="add-testimonials" element={<AddTestimonials />} />
           <Route path="testimonials-list" element={<TestimonialsList />} />
 
