@@ -8,7 +8,6 @@ import {
   Lock,
   User,
   Plane,
-  Globe,
   Star,
   Shield,
   MapPin,
@@ -24,14 +23,20 @@ function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [loginType, setLoginType] = useState("admin");
 
   // ✅ Check if already logged in
   useEffect(() => {
     const token =
       localStorage.getItem("adminToken") ||
       sessionStorage.getItem("adminToken");
+    const influencerToken =
+      localStorage.getItem("influencerToken") ||
+      sessionStorage.getItem("influencerToken");
     if (token) {
       navigate("/dashboard", { replace: true });
+    } else if (influencerToken) {
+      navigate("/influencer-dashboard", { replace: true });
     }
   }, [navigate]);
 
@@ -63,24 +68,39 @@ function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const response = await api.post("/api/cms/auth/login", credentials);
-      const { token, admin } = response.data;
+      const isInfluencer = loginType === "influencer";
+      const response = await api.post(
+        isInfluencer ? "/api/influencers/auth/login" : "/api/cms/auth/login",
+        credentials,
+      );
+      const { token } = response.data;
+      const account = isInfluencer ? response.data.influencer : response.data.admin;
+      if (!token || !account?.username) {
+        throw new Error("The server returned an incomplete login response.");
+      }
 
+      localStorage.removeItem(isInfluencer ? "adminToken" : "influencerToken");
+      sessionStorage.removeItem(isInfluencer ? "adminToken" : "influencerToken");
       const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem("adminToken", token);
-      storage.setItem("adminInfo", JSON.stringify(admin));
-      
+      storage.setItem(isInfluencer ? "influencerToken" : "adminToken", token);
+      storage.setItem(
+        isInfluencer ? "influencerInfo" : "adminInfo",
+        JSON.stringify(account),
+      );
+
       if (rememberMe) localStorage.setItem("rememberMe", "true");
 
       await Swal.fire({
         icon: "success",
         title: "Login Successful!",
-        html: `Welcome back, <span style="color: #2563EB; font-weight: bold; text-transform: capitalize;">${admin.username}</span>!`,
+        html: `Welcome back, <span style="color: #2563EB; font-weight: bold; text-transform: capitalize;">${account.username}</span>!`,
         timer: 1500,
         showConfirmButton: false,
       });
 
-      navigate("/dashboard", { replace: true });
+      navigate(isInfluencer ? "/influencer-dashboard" : "/dashboard", {
+        replace: true,
+      });
     } catch (error) {
       console.error("Login error:", error);
       const message = error.response?.data?.message || "Invalid username or password!";
@@ -180,6 +200,23 @@ function AdminLogin() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
+            <div className="grid grid-cols-2 border border-gray-200">
+              {[
+                ["admin", "Admin"],
+                ["influencer", "Influencer"],
+              ].map(([type, label]) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setLoginType(type)}
+                  className={`px-4 py-3 text-sm font-bold uppercase tracking-wide ${
+                    loginType === type ? "bg-[#C8102E] text-white" : "bg-white text-gray-600"
+                  }`}
+                >
+                  {label} Login
+                </button>
+              ))}
+            </div>
             {/* USERNAME */}
             <div>
               <label className="block text-base font-semibold text-gray-700 mb-2">
@@ -270,20 +307,24 @@ function AdminLogin() {
             {/* DEMO CREDENTIALS */}
             <div className="mt-6 p-5 bg-gray-50 border border-gray-200">
               <p className="text-sm text-center text-gray-700 font-bold mb-3">
-                🔐 Demo Credentials
+                {loginType === "admin" ? "🔐 Demo Credentials" : "Influencer Account"}
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-base">
-                <div className="bg-white px-4 py-2.5 border border-gray-300">
-                  <span className="text-gray-600">Username: </span>
-                  <span className="font-bold text-[#C8102E]">admin</span>
+              {loginType === "admin" && (
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-base">
+                  <div className="bg-white px-4 py-2.5 border border-gray-300">
+                    <span className="text-gray-600">Username: </span>
+                    <span className="font-bold text-[#C8102E]">admin</span>
+                  </div>
+                  <div className="bg-white px-4 py-2.5 border border-gray-300">
+                    <span className="text-gray-600">Password: </span>
+                    <span className="font-bold text-[#C8102E]">admin123</span>
+                  </div>
                 </div>
-                <div className="bg-white px-4 py-2.5 border border-gray-300">
-                  <span className="text-gray-600">Password: </span>
-                  <span className="font-bold text-[#C8102E]">admin123</span>
-                </div>
-              </div>
+              )}
               <p className="text-center text-sm text-gray-500 mt-3">
-                Use these credentials for testing the admin panel
+                {loginType === "influencer"
+                  ? "Sign in with the username and password provided by your administrator."
+                  : "Use these credentials for testing the admin panel"}
               </p>
             </div>
           </form>

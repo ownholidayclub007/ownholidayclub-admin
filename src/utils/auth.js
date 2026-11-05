@@ -2,9 +2,11 @@
 import api from "../lib/api";
 
 export const logout = async () => {
+  const isAdminSession = Boolean(
+    localStorage.getItem("adminToken") || sessionStorage.getItem("adminToken"),
+  );
   try {
-    // Call backend logout (optional but professional)
-    await api.post("/api/cms/auth/logout");
+    if (isAdminSession) await api.post("/api/cms/auth/logout");
   } catch (error) {
     console.error("Logout error:", error);
   } finally {
@@ -16,11 +18,18 @@ export const logout = async () => {
 
 export const getToken = () => {
   return (
+    localStorage.getItem("influencerToken") ||
+    sessionStorage.getItem("influencerToken") ||
     localStorage.getItem("adminToken") ||
     sessionStorage.getItem("adminToken")
   );
 };
 
-export const isAuthenticated = () => {
-  return !!getToken();
-};
+export const isAuthenticated = () =>
+  Boolean(localStorage.getItem("adminToken") || sessionStorage.getItem("adminToken"));
+
+export const isInfluencerAuthenticated = () =>
+  Boolean(
+    localStorage.getItem("influencerToken") ||
+    sessionStorage.getItem("influencerToken"),
+  );

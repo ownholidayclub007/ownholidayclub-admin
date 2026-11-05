@@ -8,7 +8,6 @@ import AdminLayout from "../layout/AdminLayout";
 import Dashboard from "../pages/Dashboard";
 import ManageAdmins from "../pages/ManageAdmins";
 import ChangePassword from "../pages/ChangePassword";
-import ManageLeads from "../pages/ManageLeads";
 import ManageMembership from "../pages/ManageMembership";
 import ManageMembers from "../pages/ManageMembers";
 import PendingApplications from "../pages/PendingApplications";
@@ -44,6 +43,8 @@ import AddBudget from "../pages/AddBudget";
 import ReferralCodes from "../pages/ReferralCodes";
 import AddTestimonials from "../pages/AddTestimonials";
 import TestimonialsList from "../pages/TestimonialsList";
+import ManageInfluencers from "../pages/ManageInfluencers";
+import InfluencerDashboard from "../pages/InfluencerDashboard";
 
 /* Protected */
 import ProtectedRoute from "./ProtectedRoute";
@@ -53,6 +54,14 @@ export default function AppRoutes() {
     <Routes>
       {/* 🔓 PUBLIC */}
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/influencer-dashboard"
+        element={
+          <ProtectedRoute influencerOnly>
+            <InfluencerDashboard />
+          </ProtectedRoute>
+        }
+      />
 
       {/* 🔐 PROTECTED */}
       <Route element={<ProtectedRoute />}>
@@ -96,6 +105,7 @@ export default function AppRoutes() {
           <Route path="app-video-gallery" element={<AppVideoGallery />} />
           <Route path="add-budget" element={<AddBudget />} />
           <Route path="referral-codes" element={<ReferralCodes />} />
+          <Route path="influencers" element={<ManageInfluencers />} />
           <Route path="add-testimonials" element={<AddTestimonials />} />
           <Route path="testimonials-list" element={<TestimonialsList />} />
 

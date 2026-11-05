@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import { Copy, Download, Plus, RefreshCw, Share2, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Pencil,
+  Plus,
+  Power,
+  RefreshCw,
+  Share2,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import PageHeader from "../components/PageHeader";
 import Pagination from "../components/Pagination";
@@ -12,6 +25,7 @@ const ReferralCodes = () => {
   const [codes, setCodes] = useState([]);
   const [vpName, setVpName] = useState("");
   const [customCode, setCustomCode] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,11 +62,12 @@ const ReferralCodes = () => {
   };
 
   const getExportRows = (items) => [
-    ["S.NO", "Referral Code", "VP Name", "Memberships", "Status", "Created"],
+    ["S.NO", "Referral Code", "Full Name", "Password", "Memberships", "Status", "Created"],
     ...items.map((item, index) => [
       index + 1,
       item.code || "",
       item.referrerName || "-",
+      item.influencerAccountId?.password || "-",
       item.membershipCount || 0,
       item.isActive === false ? "Inactive" : "Active",
       item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-",
@@ -65,6 +80,7 @@ const ReferralCodes = () => {
       { wch: 8 },
       { wch: 20 },
       { wch: 28 },
+      { wch: 24 },
       { wch: 14 },
       { wch: 12 },
       { wch: 14 },
@@ -96,18 +112,23 @@ const ReferralCodes = () => {
     }
   };
 
+  const requestCodes = async (page = 1) => {
+    const response = await api.get("/api/referral-codes", {
+      params: { page, limit: itemsPerPage },
+    });
+    if (!response.data.success) {
+      throw new Error("Unable to load referral codes.");
+    }
+    return response.data;
+  };
+
   const fetchCodes = async (page = 1) => {
     setIsLoading(true);
     try {
-      const response = await api.get("/api/referral-codes", {
-        params: { page, limit: itemsPerPage },
-      });
-
-      if (response.data.success) {
-        setCodes(response.data.data || []);
-        setCurrentPage(Number(response.data.currentPage || page));
-        setTotalItems(Number(response.data.totalItems || 0));
-      }
+      const data = await requestCodes(page);
+      setCodes(data.data || []);
+      setCurrentPage(Number(data.currentPage || page));
+      setTotalItems(Number(data.totalItems || 0));
     } catch (error) {
       console.error("Failed to load referral codes:", error);
       Swal.fire("Error", "Unable to load referral codes.", "error");
@@ -152,7 +173,22 @@ const ReferralCodes = () => {
   };
 
   useEffect(() => {
-    fetchCodes(1);
+    let active = true;
+    requestCodes(1)
+      .then((data) => {
+        if (active) {
+          setCodes(data.data || []);
+          setCurrentPage(Number(data.currentPage || 1));
+          setTotalItems(Number(data.totalItems || 0));
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load referral codes:", error);
+        if (active) Swal.fire("Error", "Unable to load referral codes.", "error");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleGenerateVpCode = async (event) => {
@@ -162,8 +198,8 @@ const ReferralCodes = () => {
 
     if (!referrerName || !/^[A-Z]+(?:0[1-9]|[1-9]\d)$/.test(code)) {
       Swal.fire(
-        "Check VP details",
-        "Enter the VP name and a code ending with exactly 2 digits (e.g. DS01).",
+        "Check name and referral code",
+        "Enter the full name and a unique code ending with exactly 2 digits (e.g. DS01).",
         "warning"
       );
       return;
@@ -171,23 +207,25 @@ const ReferralCodes = () => {
 
     setIsLoading(true);
     try {
-      const response = await api.post("/api/referral-codes/generate-custom", {
-        referrerName,
+      const response = await api.post("/api/influencers/accounts", {
+        name: referrerName,
         code,
       });
 
-      if (response.data.success) {
-        setVpName("");
-        setCustomCode("");
-        await fetchCodes(1);
-        Swal.fire({
-          icon: "success",
-          title: "VP referral code generated",
-          text: `${response.data.data.referrerName}: ${response.data.data.code}`,
-          timer: 2200,
-          showConfirmButton: false,
-        });
+      setVpName("");
+      setCustomCode("");
+      const newPassword = response.data.data.password;
+      const newCodeId = response.data.data.referralCodes?.[0]?._id;
+      await fetchCodes(1);
+      if (newCodeId) {
+        setVisiblePasswords((current) => ({ ...current, [newCodeId]: true }));
       }
+      await Swal.fire({
+        icon: "success",
+        title: "Referral code and login created",
+        text: `Password: ${newPassword}. You can view it in the admin referral-code table.`,
+        confirmButtonColor: "#C8102E",
+      });
     } catch (error) {
       console.error("Generate VP referral code failed:", error);
       Swal.fire(
@@ -200,10 +238,140 @@ const ReferralCodes = () => {
     }
   };
 
+  const handleCreateLogin = async (item) => {
+    const confirmation = await Swal.fire({
+      title: `Create login for ${item.code}`,
+      text: "A unique password will be generated automatically.",
+      showCancelButton: true,
+      confirmButtonText: "Create login",
+      confirmButtonColor: "#C8102E",
+    });
+    if (!confirmation.isConfirmed) return;
+
+    try {
+      const response = await api.post("/api/influencers/accounts", {
+        name: item.referrerName,
+        referralCodeIds: [item._id],
+      });
+      await fetchCodes(currentPage);
+      setVisiblePasswords((current) => ({ ...current, [item._id]: true }));
+      await Swal.fire({
+        icon: "success",
+        title: "Influencer login created",
+        text: `Password: ${response.data.data.password}. It is also available in the admin table.`,
+        confirmButtonColor: "#C8102E",
+      });
+    } catch (error) {
+      console.error("Create influencer login failed:", error);
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || "Influencer login could not be created.",
+        "error"
+      );
+    }
+  };
+
+  const handleResetLoginPassword = async (item) => {
+    const confirmation = await Swal.fire({
+      title: `Reset password for ${item.code}`,
+      text: "Generate a new unique password based on this referral code?",
+      showCancelButton: true,
+      confirmButtonText: "Reset password",
+      confirmButtonColor: "#C8102E",
+    });
+    if (!confirmation.isConfirmed) return;
+
+    try {
+      const response = await api.patch(
+        `/api/influencers/accounts/${item.influencerAccountId._id}/password`,
+        {},
+      );
+      await fetchCodes(currentPage);
+      setVisiblePasswords((current) => ({ ...current, [item._id]: true }));
+      await Swal.fire({
+        icon: "success",
+        title: "Password reset",
+        text: `New password: ${response.data.password}. It is also available in the admin table.`,
+        confirmButtonColor: "#C8102E",
+      });
+    } catch (error) {
+      console.error("Reset influencer password failed:", error);
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || "Influencer password could not be reset.",
+        "error"
+      );
+    }
+  };
+
+  const handleEdit = async (item) => {
+    const codeResult = await Swal.fire({
+      title: "Edit referral code",
+      input: "text",
+      inputValue: item.code,
+      inputAttributes: { maxlength: "30", autocapitalize: "characters" },
+      showCancelButton: true,
+      confirmButtonText: "Next",
+      confirmButtonColor: "#C8102E",
+      inputValidator: (value) =>
+        !/^[A-Za-z0-9-]{3,30}$/.test(value.trim())
+          ? "Use 3–30 letters, numbers, or hyphens."
+          : undefined,
+    });
+    if (!codeResult.isConfirmed) return;
+
+    const nameResult = await Swal.fire({
+      title: "Edit full name",
+      input: "text",
+      inputValue: item.referrerName || "",
+      inputAttributes: { maxlength: "100" },
+      showCancelButton: true,
+      confirmButtonText: "Save changes",
+      confirmButtonColor: "#C8102E",
+      inputValidator: (value) =>
+        !value.trim() ? "Full name is required." : undefined,
+    });
+    if (!nameResult.isConfirmed) return;
+
+    try {
+      await api.put(`/api/referral-codes/${item._id}`, {
+        code: codeResult.value.trim().toUpperCase(),
+        referrerName: nameResult.value.trim(),
+      });
+      await fetchCodes(currentPage);
+      Swal.fire("Saved", "Referral code and full name updated.", "success");
+    } catch (error) {
+      console.error("Update referral code failed:", error);
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || "Referral code could not be updated.",
+        "error"
+      );
+    }
+  };
+
+  const handleToggleActive = async (item) => {
+    try {
+      await api.put(`/api/referral-codes/${item._id}`, {
+        code: item.code,
+        referrerName: item.referrerName,
+        isActive: item.isActive === false,
+      });
+      await fetchCodes(currentPage);
+    } catch (error) {
+      console.error("Update referral code status failed:", error);
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || "Referral code status could not be updated.",
+        "error"
+      );
+    }
+  };
+
   const handleDelete = async (id, code) => {
     const result = await Swal.fire({
       title: "Delete referral code?",
-      text: `Are you sure you want to delete ${code}?`,
+      text: `Delete ${code} and its influencer login? Membership history may be affected.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#C8102E",
@@ -244,7 +412,7 @@ const ReferralCodes = () => {
       <div className="space-y-6 bg-white p-8 border-2 border-gray-200 mt-6 rounded-none shadow-md">
         <PageHeader
           title="REFERRAL CODES"
-          description="Generate unique referral codes for membership purchases and track how many members used each code."
+          description="Create and manage VP referral codes, linked influencer logins, and membership totals."
         >
           <button
             type="button"
@@ -263,14 +431,14 @@ const ReferralCodes = () => {
 
         <form
           onSubmit={handleGenerateVpCode}
-          className="bg-[#f7f7f7] border-2 border-gray-200 p-5 flex flex-col md:flex-row md:items-end gap-4"
+          className="bg-[#f7f7f7] border-2 border-gray-200 p-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4 md:items-end"
         >
           <div className="flex-1">
             <label
               htmlFor="vp-name"
               className="block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-2"
             >
-              VP name
+              Full name
             </label>
             <input
               id="vp-name"
@@ -312,7 +480,7 @@ const ReferralCodes = () => {
             className="inline-flex items-center justify-center gap-2 bg-[#C8102E] px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-white disabled:opacity-60"
           >
             {isLoading ? <RefreshCw className="animate-spin" size={14} /> : <Plus size={14} />}
-            Generate VP Code
+            Create Code & Login
           </button>
         </form>
 
@@ -321,8 +489,10 @@ const ReferralCodes = () => {
             <thead className="bg-[#111827] text-white">
               <tr>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Code</th>
-                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">VP Name</th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Full Name</th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Password</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Memberships</th>
+                <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Status</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Created</th>
                 <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.2em]">Action</th>
               </tr>
@@ -330,7 +500,7 @@ const ReferralCodes = () => {
             <tbody>
               {codes.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-10 text-center text-sm text-gray-500">
+                  <td colSpan="7" className="px-4 py-10 text-center text-sm text-gray-500">
                     No referral codes generated yet.
                   </td>
                 </tr>
@@ -339,7 +509,43 @@ const ReferralCodes = () => {
                   <tr key={item._id} className="border-b border-gray-200 even:bg-gray-50">
                     <td className="px-4 py-3 font-bold text-[#C8102E]">{item.code}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{item.referrerName || "-"}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {item.influencerAccountId?.password ? (
+                        <div className="flex min-w-36 items-center gap-2">
+                          <span className="font-mono text-gray-700">
+                            {visiblePasswords[item._id]
+                              ? item.influencerAccountId.password
+                              : "••••••••••••"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisiblePasswords((current) => ({
+                                ...current,
+                                [item._id]: !current[item._id],
+                              }))
+                            }
+                            className="text-gray-500 hover:text-gray-900"
+                            title={visiblePasswords[item._id] ? "Hide password" : "Show password"}
+                            aria-label={`${visiblePasswords[item._id] ? "Hide" : "Show"} password for ${item.code}`}
+                          >
+                            {visiblePasswords[item._id] ? (
+                              <EyeOff size={15} />
+                            ) : (
+                              <Eye size={15} />
+                            )}
+                          </button>
+                        </div>
+                      ) : item.influencerAccountId ? (
+                        <span className="text-amber-700">Reset to generate</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm font-semibold text-gray-800">{item.membershipCount || 0}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {item.isActive === false ? "Inactive" : "Active"}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-"}
                     </td>
@@ -362,6 +568,50 @@ const ReferralCodes = () => {
                           aria-label={`Share referral code ${item.code}`}
                         >
                           <Share2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(item)}
+                          className="inline-flex items-center justify-center border-2 border-blue-200 bg-blue-50 p-2 text-blue-700 hover:bg-blue-100"
+                          title="Edit referral code and full name"
+                          aria-label={`Edit ${item.code} referral details`}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        {item.influencerAccountId ? (
+                          <button
+                            type="button"
+                            onClick={() => handleResetLoginPassword(item)}
+                            className="inline-flex items-center justify-center border-2 border-amber-200 bg-amber-50 p-2 text-amber-700 hover:bg-amber-100"
+                            title="Reset influencer password"
+                            aria-label={`Reset password for ${item.code}`}
+                          >
+                            <KeyRound size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleCreateLogin(item)}
+                            disabled={!item.referrerName}
+                            className="inline-flex items-center justify-center border-2 border-emerald-200 bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                            title={item.referrerName ? "Create influencer login" : "Add full name before creating login"}
+                            aria-label={`Create login for ${item.code}`}
+                          >
+                            <UserPlus size={14} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(item)}
+                          className={`inline-flex items-center justify-center border-2 p-2 ${
+                            item.isActive === false
+                              ? "border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                              : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                          }`}
+                          title={item.isActive === false ? "Activate referral code" : "Deactivate referral code"}
+                          aria-label={`${item.isActive === false ? "Activate" : "Deactivate"} ${item.code}`}
+                        >
+                          <Power size={14} />
                         </button>
                         <button
                           type="button"
