@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
 import {
+  CloudUpload,
   Copy,
   Download,
   Eye,
@@ -30,6 +31,7 @@ const ReferralCodes = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isPreparingSheet, setIsPreparingSheet] = useState(false);
+  const [isSyncingGoogleSheet, setIsSyncingGoogleSheet] = useState(false);
 
   const fetchAllCodes = async () => {
     const firstPageResponse = await api.get("/api/referral-codes", {
@@ -109,6 +111,27 @@ const ReferralCodes = () => {
       );
     } finally {
       setIsPreparingSheet(false);
+    }
+  };
+
+  const handleSyncGoogleSheet = async () => {
+    setIsSyncingGoogleSheet(true);
+    try {
+      const response = await api.post("/api/referral-codes/sync-google-sheet");
+      Swal.fire(
+        "Synced",
+        `${response.data.syncedCount} referral codes synced to Google Sheets.`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Sync referral codes to Google Sheets failed:", error);
+      Swal.fire(
+        "Google Sheets sync failed",
+        error?.response?.data?.message || "Could not sync referral codes to Google Sheets.",
+        "error"
+      );
+    } finally {
+      setIsSyncingGoogleSheet(false);
     }
   };
 
@@ -414,6 +437,19 @@ const ReferralCodes = () => {
           title="REFERRAL CODES"
           description="Create and manage VP referral codes, linked influencer logins, and membership totals."
         >
+          <button
+            type="button"
+            onClick={handleSyncGoogleSheet}
+            disabled={isSyncingGoogleSheet || isPreparingSheet || isLoading}
+            className="inline-flex items-center justify-center gap-2 border-2 border-green-700 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSyncingGoogleSheet ? (
+              <RefreshCw className="animate-spin" size={14} />
+            ) : (
+              <CloudUpload size={14} />
+            )}
+            Sync Google Sheet
+          </button>
           <button
             type="button"
             onClick={handleDownloadExcel}
