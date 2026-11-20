@@ -32,6 +32,7 @@ const HolidayBookings = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [deletingBookingId, setDeletingBookingId] = useState(null);
 
   useEffect(() => {
     fetchBookings();
@@ -150,6 +151,50 @@ const HolidayBookings = () => {
   const handleViewBooking = (booking) => {
     setSelectedBooking(booking);
     setIsViewModalOpen(true);
+  };
+
+  const handleDeleteBooking = async (booking) => {
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Delete booking?',
+      text: `This permanently deletes slot #${booking.slotNumber} for ${booking.userName}. The slot may become available again.`,
+      showCancelButton: true,
+      confirmButtonColor: '#DC2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete booking',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
+    setDeletingBookingId(booking._id);
+    try {
+      await api.delete(`/api/members/${encodeURIComponent(booking.userId)}/holiday-bookings/${encodeURIComponent(booking._id)}`);
+      setBookings((previous) => previous.filter((item) =>
+        item.userId !== booking.userId || item._id !== booking._id
+      ));
+      setCurrentPage((page) => Math.min(page, Math.max(1, Math.ceil((filteredBookings.length - 1) / itemsPerPage))));
+      if (selectedBooking?._id === booking._id && selectedBooking?.userId === booking.userId) {
+        setIsViewModalOpen(false);
+        setSelectedBooking(null);
+      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Booking deleted',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error('Booking deletion failed:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Deletion failed',
+        text: error.response?.data?.message || 'Failed to delete booking.',
+        confirmButtonColor: '#C8102E',
+      });
+    } finally {
+      setDeletingBookingId(null);
+    }
   };
 
   const columns = [
@@ -286,6 +331,16 @@ const HolidayBookings = () => {
                         <XCircle size={14} />
                     </button>
                 )}
+                <button
+                    type="button"
+                    onClick={() => handleDeleteBooking(row)}
+                    disabled={deletingBookingId !== null}
+                    className="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 transition-colors rounded disabled:opacity-50"
+                    title="Delete Booking"
+                    aria-label={`Delete booking for ${row.userName}, slot ${row.slotNumber}`}
+                >
+                    <Trash2 size={14} />
+                </button>
             </div>
         )
     }
