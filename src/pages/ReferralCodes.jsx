@@ -64,12 +64,11 @@ const ReferralCodes = () => {
   };
 
   const getExportRows = (items) => [
-    ["S.NO", "Referral Code", "Full Name", "Password", "Memberships", "Status", "Created"],
+    ["S.NO", "Referral Code", "Full Name", "Memberships", "Status", "Created"],
     ...items.map((item, index) => [
       index + 1,
       item.code || "",
       item.referrerName || "-",
-      item.influencerAccountId?.password || "-",
       item.membershipCount || 0,
       item.isActive === false ? "Inactive" : "Active",
       item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-GB") : "-",
@@ -82,7 +81,6 @@ const ReferralCodes = () => {
       { wch: 8 },
       { wch: 20 },
       { wch: 28 },
-      { wch: 24 },
       { wch: 14 },
       { wch: 12 },
       { wch: 14 },
