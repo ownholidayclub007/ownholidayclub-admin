@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Calendar, Download, Eye, Mail, RefreshCw, Smartphone } from "lucide-react";
+import { Calendar, CloudUpload, Download, Eye, Mail, RefreshCw, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -20,6 +20,23 @@ const PendingApplications = () => {
     } catch (error) {
       console.error("Failed to load pending applications:", error);
       Swal.fire("Error", "Failed to fetch pending applications.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const syncGoogleSheet = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.post("/api/members/pending-applications/sync-google-sheet");
+      Swal.fire("Synced", `${response.data.syncedCount} applications synced to Google Sheets.`, "success");
+    } catch (error) {
+      console.error("Failed to sync pending applications to Google Sheets:", error);
+      Swal.fire(
+        "Google Sheets sync failed",
+        error.response?.data?.message || "Could not sync pending applications.",
+        "error",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +92,15 @@ const PendingApplications = () => {
         >
           <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           Refresh
+        </button>
+        <button
+          type="button"
+          onClick={syncGoogleSheet}
+          disabled={isLoading}
+          className="flex items-center gap-2 border border-green-700 px-4 py-2 text-sm font-bold uppercase text-green-800 hover:bg-green-50 disabled:opacity-50"
+        >
+          <CloudUpload size={16} />
+          Sync Google Sheet
         </button>
         <button
           type="button"
